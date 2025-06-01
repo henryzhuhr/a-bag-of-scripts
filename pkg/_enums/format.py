@@ -1,6 +1,25 @@
 from enum import StrEnum
 
 
+class FilenameRule(StrEnum):
+    """文件名重命名规则"""
+
+    STANDAERD_DATETIME = "{year}{month:02d}{day:02d}_{hour:02d}{minute:02d}{second:02d}"
+    """标准日期格式 YYYYMMDD_HHMMSS"""
+
+    DATE = "{year}{month:02d}{day:02d}"
+    """日期格式"""
+
+    TIME = "{hour:02d}{minute:02d}{second:02d}"
+    """时间格式"""
+
+    ALBUM = "{album}"
+    """相册名"""
+
+    DEFAULT = f"{str(ALBUM)}_{str(TIME)}"
+    """默认格式"""
+
+
 class PhotoFormat(StrEnum):
     """文件格式"""
 
