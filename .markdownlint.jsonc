@@ -1,0 +1,5 @@
+// https://github.com/DavidAnson/vscode-markdownlint#configure
+{
+    "MD010": false,
+    "MD013": false
+}
