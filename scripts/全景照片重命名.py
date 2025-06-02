@@ -15,7 +15,7 @@ from pkg._types.photo import FileTag
 from utils.xphoto import XPhoto
 
 # ================== 目录路径设置 ==================
-BD = PhotographDir.ICLOUD_PANO_LOCAL
+BD = PhotographDir.ICLOUD_RAW_PANO
 """基本目录 base dir"""
 
 

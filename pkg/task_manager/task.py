@@ -1,53 +1,71 @@
-import typing
 from abc import ABC, abstractmethod
+from typing import Any, List
 
 
-class Task(ABC):
-    """定义任务"""
+class BaseTask(ABC):
+    """任务基类"""
 
-    pass
+    @classmethod
+    @abstractmethod
+    def must_match(cls, obj: Any) -> None:
+        """
+        判断输入对象是否匹配当前任务类型
+        如果不符合，必须抛出异常（如 ValueError）。
+
+        Args:
+            obj (Any): 待检查的对象
+        Raises:
+            Exception: 输入对象不符合要求抛出异常
+        """
+        raise NotImplementedError("Subclasses must implement this method")
 
     @abstractmethod
-    def description(self) -> str:
-        """任务描述，用于展示给用户"""
-        pass
+    def generate(self) -> None:
+        """生成任务方法，子类需要实现此方法，且需要调用 must_match 方法来验证输入对象是否符合要求。"""
+        try:
+            self.must_match(obj=self)
+        except Exception as e:
+            raise Exception(f"Object does not match task requirements: {e}")
+        raise NotImplementedError("Subclasses must implement this method")
 
     @abstractmethod
-    def generate(self) -> str:
-        """生成执行任务"""
-        pass
+    def description(self, dry_run: bool = True) -> str:
+        """
+        返回任务描述
+
+        Args:
+            dry_run(bool): 模拟执行的时候，输出对应的描述信息
+        Returns:
+            str: 任务描述信息
+        """
+        raise NotImplementedError("Subclasses must implement this method")
 
     @abstractmethod
-    def execute(self, dry_run=True) -> None:
-        """执行任务，dry_run 为 True 时不真实执行"""
-        pass
+    def execute(self, dry_run: bool = True) -> None:
+        """
+        执行当前任务
+
+        Args:
+            dry_run(bool): 是否为模拟执行
+        """
+        raise NotImplementedError("Subclasses must implement this method")
 
 
 class TaskManager:
-    pass
+    """任务管理器，用于注册和管理处理器任务"""
+
+    task_list: List[BaseTask]
+    """任务列表，存储所有注册的处理器"""
 
     def __init__(self):
-        self.tasks: typing.List[Task] = []
+        self.task_list = []
 
-    def add_task(self, task: Task):
-        self.tasks.append(task)
+    def add_task(self, task: BaseTask) -> None:
+        """添加任务到列表"""
+        self.task_list.append(task)
 
-    def show_tasks(self):
-        print("\n📋 待执行任务列表:")
-        for i, task in enumerate(self.tasks):
-            print(f"{i + 1}. {task.description()}")
-
-    def confirm_and_execute(self, dry_run=True):
-        if not self.tasks:
-            print("没有待执行的任务")
-            return
-
-        self.show_tasks()
-
-        confirm = input("\n是否确认执行以上任务？(yes/no): ").lower()
-        if confirm in ["yes", "y"]:
-            for task in self.tasks:
-                task.execute(dry_run=dry_run)
-            print("✅ 所有任务已完成")
-        else:
-            print("❌ 已取消执行")
+    def execute_all(self, dry_run: bool = True) -> None:
+        """执行所有任务"""
+        for task in self.task_list:
+            print(f"执行任务: {task.description()}")
+            task.execute(dry_run)

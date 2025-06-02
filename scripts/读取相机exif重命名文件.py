@@ -11,6 +11,8 @@ import exifread
 import piexif
 import pillow_heif
 
+from pkg._enums.photo import PhotographDir
+
 
 class FileTag:
     def __init__(self, tag: str, dir: str):
@@ -19,12 +21,11 @@ class FileTag:
 
 
 # ================== 目录路径设置 ==================
-ICLOUD_DIR = r"$HOME/Library/Mobile Documents/com~apple~CloudDocs"  # iCloud 目录
-BASE_DIR = f"{ICLOUD_DIR}/Photograph-local"
-# BASE_DIR = f"{ICLOUD_DIR}/Panorama-local"
+BASE_DIR = PhotographDir.ICLOUD_RAW_PHOTO
+BASE_DIR = ".cache/Photograph-local"
 FILE_TAG_LIST: typing.List[FileTag] = [
     # fmt: off
-    FileTag(tag="珠海长隆海洋王国", dir=f"{BASE_DIR}/250524-珠海长隆海洋王国"),
+    FileTag(tag="相册名称", dir=f"{BASE_DIR}/YYMMDD-相册名称"),
     # fmt: on
 ]
 
