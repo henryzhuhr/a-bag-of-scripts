@@ -1,3 +1,4 @@
+from datetime import datetime
 from pathlib import Path
 
 import exifread
@@ -53,3 +54,19 @@ class ExifInfo:
             return ExifImageMake.from_string(str(make))
         except Exception as e:
             raise ValueError(f"Error parsing camera make from EXIF data: {e}")
+
+    @property
+    def original_datetime(self) -> datetime:
+        """
+        获取原始拍摄时间
+        :return: 拍摄时间
+        """
+        datetime_str = self._exifdata.get("EXIF DateTimeOriginal", None)
+        if datetime_str is None:
+            raise ValueError("EXIF DateTimeOriginal not found in EXIF data")
+
+        print(datetime_str)
+        try:
+            return datetime.strptime(str(datetime_str), "%Y:%m:%d %H:%M:%S")
+        except ValueError as e:
+            raise ValueError(f"Error parsing original datetime from EXIF data: {e}")

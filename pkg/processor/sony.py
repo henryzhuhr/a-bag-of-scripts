@@ -19,38 +19,17 @@ from pkg.utils._exif import ExifInfo
 
 
 class RenameSonyRawPhotoTask(BaseTask):
-    """索尼相机原始照片任务，用于处理单个 .ARW 文件及其对应的 .XMP 文件"""
+    """重命名索尼RAW照片任务，用于处理单个 .ARW 文件及其对应的 .XMP 文件"""
 
-    file_path: Path
+    _file_path: Path
     """文件路径"""
 
-    album_name: str
+    _album_name: str
     """相册名称"""
-
-    @classmethod
-    def must_match(cls, obj: Path):
-        """检查文件是否是索尼的RAW文件"""
-        try:
-            # 检查输入对象是否是 Path 实例，且是否存
-            if not isinstance(obj, Path) or not obj.exists():
-                raise FileExistsError(f"file does not exist: {obj}")
-
-            # 检查文件后缀是否为 .ARW / .arw
-            if obj.suffix.lower() != ".arw":
-                raise TypeError(f"file extension must be .ARW / .arw, got {obj.suffix}")
-
-            # 使用exif 读取照片，检查
-            exif_info = ExifInfo(obj)
-            if exif_info.camera_make != ExifImageMake.SONY:
-                raise ValueError(
-                    f"file {obj} is not a Sony RAW photo, camera make is {exif_info.camera_make}"
-                )
-        except Exception as e:
-            raise ValueError(f"reading EXIF data from file '{obj}' error: {e}")
 
     def __init__(self, file_path: typing.Union[Path, str], album_name: str):
         """
-        初始化索尼原始照片处理器
+        初始化索尼原始照片任务
 
         Args:
           file_path (Union[Path, str]): 文件路径，可以是字符串或 Path 实例
@@ -59,41 +38,78 @@ class RenameSonyRawPhotoTask(BaseTask):
         super().__init__()
 
         if isinstance(file_path, str):
-            self.file_path = Path(file_path)
+            self._file_path = Path(file_path)
         elif isinstance(file_path, Path):
-            self.file_path = file_path
+            self._file_path = file_path
         else:
             raise TypeError("file_path must be a str or Path instance")
 
-        self.album_name = album_name
+        self._album_name = album_name
 
         self.set_rename_rule()
 
-    def generate(self) -> None:
-        """生成重命名任务"""
+        # 默认规则
+        self.rename_rule = "{date}-{album}-{time}"
+
+    @classmethod
+    def must_match(cls, obj: Path):
+        """检查文件是否是索尼的RAW文件"""
         try:
-            self.must_match(self.file_path)
+            # 「检查点」 检查输入对象是否是 Path 实例，且是否存
+            if not isinstance(obj, Path) or not obj.exists():
+                raise FileExistsError(f"file does not exist: {obj}")
+
+            # 「检查点」 检查文件后缀是否为 .ARW / .arw
+            if obj.suffix.lower() != ".arw":
+                raise TypeError(f"file extension must be .ARW / .arw, got {obj.suffix}")
+
+            # 「检查点」 使用exif 读取照片，检查
+            exif_info = ExifInfo(obj)
+            if exif_info.camera_make != ExifImageMake.SONY:
+                raise ValueError(
+                    f"file {obj} is not a Sony RAW photo, camera make is {exif_info.camera_make}"
+                )
         except Exception as e:
-            logger.warning(f"file '{self.file_path}' does not match this task: {e}")
+            raise ValueError(f"reading EXIF data from file '{obj}' error: {e}")
+
+    def create(self) -> None:
+        try:
+            self.must_match(self._file_path)
+        except Exception as e:
+            logger.warning(f"file '{self._file_path}' does not match this task: {e}")
             return
+
+        try:
+            exif_info = ExifInfo(self._file_path)
+            # 获取拍摄时间
+            shot_time = exif_info.original_datetime
+            print(shot_time)
+        except Exception as e:
+            logger.warning(f"获取 EXIF 时间失败: {e}")
+            # 如果获取 EXIF 时间失败，使用文件修改时间
+            shot_time = datetime.fromtimestamp(self._file_path.stat().st_mtime)
+
+        self._ready = True
 
     def description(self, dry_run: bool = True) -> str:
         """返回任务描述"""
         try:
             new_name = self._generate_new_filename()
-            return f"重命名 {self.file_path.name} -> {new_name}.ARW"
+            return f"重命名 {self._file_path.name} -> {new_name}.ARW"
         except Exception as e:
-            return f"重命名 {self.file_path.name} (错误: {e})"
+            return f"重命名 {self._file_path.name} (错误: {e})"
 
     def execute(self, dry_run: bool = True) -> None:
         """
         执行当前任务
-        :param dry_run: 是否为模拟执行
+        :param  : 是否为模拟执行
         """
         # logger.info(
         #     f"Executing task for {self.file_path} in album {self.album_name}, dry_run={dry_run}"
         # )
         # 这里可以添加执行任务的逻辑
+        if not self._ready:
+            raise RuntimeError("task not generated yet.")
         if dry_run:
             logger.info(self.description(dry_run=True))
         else:
@@ -108,7 +124,7 @@ class RenameSonyRawPhotoTask(BaseTask):
         try:
             # 使用 exiftool 获取 EXIF 数据
             result = subprocess.run(
-                ["exiftool", "-json", "-DateTimeOriginal", str(self.file_path)],
+                ["exiftool", "-json", "-DateTimeOriginal", str(self._file_path)],
                 capture_output=True,
                 text=True,
                 check=True,
@@ -132,7 +148,7 @@ class RenameSonyRawPhotoTask(BaseTask):
         ) as e:
             print(f"获取 EXIF 时间失败: {e}")
             # 如果无法获取 EXIF 时间，使用文件修改时间
-            mtime = datetime.fromtimestamp(self.file_path.stat().st_mtime)
+            mtime = datetime.fromtimestamp(self._file_path.stat().st_mtime)
             return mtime.strftime("%H%M%S")
 
     def _generate_new_filename(self) -> str:
@@ -144,7 +160,7 @@ class RenameSonyRawPhotoTask(BaseTask):
         time_part = self._get_exif_datetime()
 
         # 去掉日期前缀，获取纯相册名称
-        album_only = re.sub(r"^\d{6}-", "", self.album_name)
+        album_only = re.sub(r"^\d{6}-", "", self._album_name)
 
         return f"{date_part}-{album_only}-{time_part}"
 
@@ -158,11 +174,11 @@ class RenameSonyRawPhotoTask(BaseTask):
         :return: YYMMDD 格式的日期
         """
         # 匹配 YYMMDD-相册名称 格式
-        match = re.match(r"^(\d{6})-", self.album_name)
+        match = re.match(r"^(\d{6})-", self._album_name)
         if match:
             return match.group(1)
         else:
-            raise ValueError(f"无法从相册名称 '{self.album_name}' 中提取日期")
+            raise ValueError(f"无法从相册名称 '{self._album_name}' 中提取日期")
 
 
 def _test():
@@ -184,12 +200,9 @@ def _test():
         return
 
     for raw_file in raw_files:
-        processor = RenameSonyRawPhotoTask(raw_file, album_name)
-        logger.info(
-            f"Processing file: {processor.file_path}, Album: {processor.album_name}"
-        )
-        processor.generate()
-        processor.execute(dry_run)
+        task = RenameSonyRawPhotoTask(raw_file, album_name)
+        task.create()
+        task.execute(dry_run)
         break  # for testing, remove this break to process all files
 
 

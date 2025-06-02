@@ -5,6 +5,12 @@ from typing import Any, List
 class BaseTask(ABC):
     """任务基类"""
 
+    _ready: bool
+    """任务是否准备就绪的标志"""
+
+    def __init__(self):
+        self._ready = False  # 初始化时任务未准备就绪
+
     @classmethod
     @abstractmethod
     def must_match(cls, obj: Any) -> None:
@@ -20,15 +26,6 @@ class BaseTask(ABC):
         raise NotImplementedError("Subclasses must implement this method")
 
     @abstractmethod
-    def generate(self) -> None:
-        """生成任务方法，子类需要实现此方法，且需要调用 must_match 方法来验证输入对象是否符合要求。"""
-        try:
-            self.must_match(obj=self)
-        except Exception as e:
-            raise Exception(f"Object does not match task requirements: {e}")
-        raise NotImplementedError("Subclasses must implement this method")
-
-    @abstractmethod
     def description(self, dry_run: bool = True) -> str:
         """
         返回任务描述
@@ -38,6 +35,18 @@ class BaseTask(ABC):
         Returns:
             str: 任务描述信息
         """
+        raise NotImplementedError("Subclasses must implement this method")
+
+    @abstractmethod
+    def create(self) -> None:
+        """创建任务，子类需要实现此方法，且需要调用 must_match 方法来检查输入对象是否符合要求。"""
+        try:
+            self.must_match(obj=self)
+        except Exception as e:
+            raise Exception(f"Object does not match task requirements: {e}")
+
+        self._ready = True
+
         raise NotImplementedError("Subclasses must implement this method")
 
     @abstractmethod
