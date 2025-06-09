@@ -97,16 +97,16 @@ class RenameSonyRawPhotoTask(BaseTask):
             new_name = self._generate_new_filename()
             return f"重命名 {self._file_path.name} -> {new_name}.ARW"
         except Exception as e:
-            return f"重命名 {self._file_path.name} (错误: {e})"
+            raise RuntimeError(f"生成新文件名失败: {e}") from e
 
     def execute(self, dry_run: bool = True) -> None:
         """
         执行当前任务
         :param  : 是否为模拟执行
         """
-        # logger.info(
-        #     f"Executing task for {self.file_path} in album {self.album_name}, dry_run={dry_run}"
-        # )
+        logger.info(
+            f"Executing task for {self._file_path} in album {self._album_name}, dry_run={dry_run}"
+        )
         # 这里可以添加执行任务的逻辑
         if not self._ready:
             raise RuntimeError("task not generated yet.")
@@ -116,69 +116,56 @@ class RenameSonyRawPhotoTask(BaseTask):
             # 实际执行重命名或其他操作
             pass
 
-    def _get_exif_datetime(self) -> str:
+    def _get_exif_datetime(self) -> datetime:
         """
         使用 exiftool 获取照片的拍摄时间
         :return: 格式化的时间字符串 HHMMSS
         """
-        try:
-            # 使用 exiftool 获取 EXIF 数据
-            result = subprocess.run(
-                ["exiftool", "-json", "-DateTimeOriginal", str(self._file_path)],
-                capture_output=True,
-                text=True,
-                check=True,
-            )
 
-            exif_data = json.loads(result.stdout)[0]
-            date_time_original = exif_data.get("DateTimeOriginal")
+        logger.debug(f"获取文件 {self._file_path} 的 EXIF 时间")
 
-            if not date_time_original:
-                raise ValueError("无法获取拍摄时间")
+        # 检查文件后缀
+        file_suffix = self._file_path.suffix.lower()
 
-            # 解析时间格式 "YYYY:MM:DD HH:MM:SS"
-            dt = datetime.strptime(date_time_original, "%Y:%m:%d %H:%M:%S")
-            return dt.strftime("%H%M%S")
-
-        except (
-            subprocess.CalledProcessError,
-            json.JSONDecodeError,
-            ValueError,
-            KeyError,
-        ) as e:
-            print(f"获取 EXIF 时间失败: {e}")
-            # 如果无法获取 EXIF 时间，使用文件修改时间
-            mtime = datetime.fromtimestamp(self._file_path.stat().st_mtime)
-            return mtime.strftime("%H%M%S")
+        # 对 RAW 和 HEIF 文件使用不同的处理方式
+        EXIF_DATETIME_FORMAT = "%Y:%m:%d %H:%M:%S"
+        if file_suffix in [".arw", ".dng"]:
+            with open(self._file_path, "rb") as f:
+                exif_data = exifread.process_file(f, details=False, strict=True)
+                # logger.debug(f"EXIF data of '{self._file_path}': {exif_data}")
+            date_time = exif_data["EXIF DateTimeOriginal"].printable
+            if isinstance(date_time, str):
+                date_time = datetime.strptime(date_time, EXIF_DATETIME_FORMAT)
+            else:
+                raise ValueError(
+                    f"EXIF DateTimeOriginal of ARW file is type {type(date_time)}, expected str"
+                )
+        elif file_suffix in [".heif", ".heic", ".hif"]:
+            # reference from: https://github.com/bigcat88/pillow_heif/blob/master/examples/heif_dump_info.py
+            heif_file = pillow_heif.open_heif(self._file_path)
+            exif_dict = piexif.load(heif_file.info["exif"], key_is_name=True)
+            exif_data = exif_dict["Exif"]
+            date_time = exif_data["DateTimeOriginal"]
+            date_time = str(date_time, "utf-8")
+            date_time = datetime.strptime(date_time, EXIF_DATETIME_FORMAT)
+        else:
+            raise ValueError(f"Unsupported file type: {file_suffix}")
+        logger.debug(f"获取到的 EXIF 时间: {date_time}")
+        return date_time
 
     def _generate_new_filename(self) -> str:
         """
         生成新的文件名
         :return: 新文件名（不含扩展名）
         """
-        date_part = self._extract_date_from_album_name()
-        time_part = self._get_exif_datetime()
-
-        # 去掉日期前缀，获取纯相册名称
-        album_only = re.sub(r"^\d{6}-", "", self._album_name)
-
-        return f"{date_part}-{album_only}-{time_part}"
+        datestr = self._get_exif_datetime()
+        print(f"获取到的时间字符串: {datestr}")
+        exit()
+        pass
 
     def set_rename_rule(self, rule: FilenameRule = FilenameRule.DEFAULT):
         """设置重命名规则"""
         self.rename_rule = rule
-
-    def _extract_date_from_album_name(self) -> str:
-        """
-        从相册名称中提取日期部分
-        :return: YYMMDD 格式的日期
-        """
-        # 匹配 YYMMDD-相册名称 格式
-        match = re.match(r"^(\d{6})-", self._album_name)
-        if match:
-            return match.group(1)
-        else:
-            raise ValueError(f"无法从相册名称 '{self._album_name}' 中提取日期")
 
 
 def _test():
