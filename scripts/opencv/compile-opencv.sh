@@ -13,12 +13,12 @@ VERSION=4.12.0
 
 clean_build_cache=true
 use_ninja=false
-enable_cuda=false
-enable_cudnn=false
+enable_cuda=true
+enable_cudnn=true
 enable_onnxruntime=false
-force_3rdparty_build=false
+force_3rdparty_build=true
 
-start_time=$(date +%s)
+
 
 # ========= log utils ==============
 DEFAULT=$(echo -en '\033[0m')
@@ -42,6 +42,7 @@ cd "$project_dir" || exit
 source_dir="$project_dir/opencv"
 contrib_dir="$project_dir/opencv_contrib"
 build_dir="/tmp/opencv-build"
+build_dir="$project_dir/opencv/build"
 install_prefix="$install_dir/opencv-$VERSION"
 
 
@@ -111,84 +112,96 @@ echo "Cloning and checking out OpenCV Contrib..."
 checkout_opencv_repo "https://github.com/opencv/opencv_contrib.git " "$contrib_dir" "$VERSION"
 
 # ========= Opencv CMake Args ====================
-additonal_args="\
--DWITH_AVIF=ON \
--DWITH_WAYLAND=ON \
--DWITH_VULKAN=ON \
--DWITH_OPENVINO=ON \
--DWITH_WEBNN=ON \
--DBUILD_TIFF=ON \
--DWITH_JPEGXL=ON \
--DWITH_OPENEXR=ON \
--DWITH_OPENGL=ON \
--DWITH_OPENVX=ON \
--DWITH_OPENNI=ON \
--DWITH_OPENNI2=ON \
--DWITH_SPNG=ON \
--DWITH_GDCM=ON \
--DWITH_PVAPI=ON \
--DWITH_ARAVIS=ON \
--DWITH_QT=ON \
--DWITH_TBB=ON \
--DWITH_HPX=ON \
--DWITH_OPENMP=ON \
--DWITH_MSMF_DXVA=ON \
--DWITH_XIMEA=ON \
--DWITH_UEYE=ON \
--DWITH_XINE=ON \
--DWITH_CLP=ON \
--DWITH_OPENCL=ON \
--DWITH_OPENCL_SVM=ON \
--DWITH_LIBREALSENSE=ON \
--DWITH_MFX=ON \
--DWITH_GDAL=ON \
--DWITH_GPHOTO2=ON \
--DWITH_QUIRC=ON \
--DWITH_TIMVX=ON \
--DWITH_CANN=ON \
--DWITH_ZLIB_NG=ON \
-"
+# -DWITH_HPX=ON # 会报错
+# -DWITH_WEBNN=ON # 会报错
+# -DWITH_MSMF_DXVA=ON only WIN32
+ADDITIONAL_ARGS=(
+    -DWITH_AVIF=ON
+    -DWITH_WAYLAND=ON
+    -DWITH_VULKAN=ON
+    -DWITH_OPENVINO=ON
+    -DBUILD_TIFF=ON
+    -DWITH_JPEGXL=ON
+    -DWITH_OPENEXR=ON
+    -DWITH_OPENGL=ON
+    -DWITH_OPENVX=ON
+    -DWITH_OPENNI=ON
+    -DWITH_OPENNI2=ON
+    -DWITH_SPNG=ON
+    -DWITH_GDCM=ON
+    -DWITH_PVAPI=ON
+    -DWITH_ARAVIS=ON
+    -DWITH_QT=ON
+    -DWITH_TBB=ON
+    -DWITH_OPENMP=ON
+    -DWITH_XIMEA=ON
+    -DWITH_UEYE=ON
+    -DWITH_XINE=ON
+    -DWITH_CLP=ON
+    -DWITH_OPENCL=ON
+    -DWITH_OPENCL_SVM=ON
+    -DWITH_LIBREALSENSE=ON
+    -DWITH_MFX=ON
+    -DWITH_GDAL=ON
+    -DWITH_GPHOTO2=ON
+    -DWITH_QUIRC=ON
+    -DWITH_TIMVX=ON
+    -DWITH_CANN=ON
+    -DWITH_ZLIB_NG=ON
+)
 
 # ENABLE_CCACHE
 
 
 if [ "$force_3rdparty_build" = "true" ]; then
-    additonal_args+=" -DOPENCV_FORCE_3RDPARTY_BUILD=ON"
+    ADDITIONAL_ARGS+=(-DOPENCV_FORCE_3RDPARTY_BUILD=ON)
 fi
 
 # ========= Python Setup ==================
 PYTHON3_EXECUTABLE=$(which python3)
-PYTHON3_LDLIBRARY=$(python3 -c "import sysconfig; print(sysconfig.get_config_var('LDLIBRARY'))")
-PYTHON3_INCLUDE_DIR=$(python3 -c "import sysconfig; print(sysconfig.get_config_var('INCLUDEPY'))")
+PYTHON3_INCLUDE_DIR=$(python3 -c "import sysconfig; print(sysconfig.get_config_var('LDLIBRARY'))")
 PYTHON3_NUMPY_INCLUDE_DIRS=$(python3 -c "import numpy; print(numpy.get_include())")
-
 if [ -z "$PYTHON3_NUMPY_INCLUDE_DIRS" ]; then
     log_fatal "numpy not found. Please install it first: python3 -m pip install numpy"
 fi
 
-PYTHON3_ARGS="-DPYTHON3_EXECUTABLE=$PYTHON3_EXECUTABLE -DPYTHON3_INCLUDE_DIR=$PYTHON3_INCLUDE_DIR -DPYTHON3_NUMPY_INCLUDE_DIRS=$PYTHON3_NUMPY_INCLUDE_DIRS"
-PYTHON3_ARGS+=" -DBUILD_opencv_python2=OFF -DBUILD_opencv_python3=ON -DBUILD_opencv_python_bindings_generator=ON"
-log_info "Python3 arguments: $PYTHON3_ARGS"
-additonal_args+=" $PYTHON3_ARGS"
+PYTHON_ARGS=(
+    -DBUILD_opencv_python2=OFF
+    -DBUILD_opencv_python3=ON
+    -DBUILD_opencv_python_bindings_generator=ON
+)
+# -DPYTHON3_EXECUTABLE="${PYTHON3_EXECUTABLE}"
+# -DPYTHON3_INCLUDE_DIR="${PYTHON3_INCLUDE_DIR}"
+# -DPYTHON3_NUMPY_INCLUDE_DIRS="${PYTHON3_NUMPY_INCLUDE_DIRS}"
+
+log_info "Python arguments: ${PYTHON_ARGS[*]}"
 
 # ========= Opencv CMake Args: CUDA Support ================
-
+# https://docs.opencv.org/4.x/d2/dbc/cuda_intro.html
 if [ $enable_cuda = "true" ]; then
     GPU_ARCH=$(nvidia-smi --query-gpu=compute_cap --format=csv,noheader | awk '{print $1}' | head -n1 | tr '.' ' ')
     CUDA_ARCH_BIN=$(echo "$GPU_ARCH" | awk '{printf "%.1f", $1 + 0.0}')
+    # Specify 'virtual' PTX architectures to build PTX intermediate
+    #  code for (see https://docs.opencv.org/4.x/d2/dbc/cuda_intro.html)
+    CUDA_ARCH_PTX="sm_$(echo "$CUDA_ARCH_BIN" | tr -d '.')"
 
     log_info "Detected GPU architecture: $GPU_ARCH"
     log_info "Setting CUDA_ARCH_BIN to: $CUDA_ARCH_BIN"
+    log_info "Setting CUDA_ARCH_PTX to: $CUDA_ARCH_PTX"
 
     CUDA_ARGS="-DWITH_CUDA=ON -DOPENCV_DNN_CUDA=ON"
     # https://github.com/opencv/opencv/issues/25215
     # depends on -DBUILD_TIFF=ON in jetson
-    # -DCUDA_ARCH_BIN=8.7 can be auto set by -DCUDA_GENERATION=Auto
-    # -DCUDA_ARCH_BIN=${CUDA_ARCH_BIN} -DCUDA_ARCH_PTX=${CUDA_ARCH_BIN}
-    CUDA_ARGS="-DWITH_CUDA=ON -DCUDA_ARCH_BIN=${CUDA_ARCH_BIN} -DCUDA_ARCH_PTX=${CUDA_ARCH_BIN} -DOPENCV_DNN_CUDA=ON -DCMAKE_CUDA_COMPILER=${CUDA_HOME}/bin/nvcc"
-    # CUDA_ARGS="-DWITH_CUDA=ON -DCUDA_GENERATION=Auto -DOPENCV_DNN_CUDA=ON -DCMAKE_CUDA_COMPILER=${CUDA_HOME}/bin/nvcc"
-
-    additonal_args+=" $CUDA_ARGS"
+    # -DCUDA_GENERATION=Auto = -DCUDA_ARCH_BIN=${CUDA_ARCH_BIN} -DCUDA_ARCH_PTX=${CUDA_ARCH_PTX}
+    CUDA_ARGS+=(
+        -DWITH_CUDA=ON
+        -DCUDA_GENERATION=Auto
+        -DOPENCV_DNN_CUDA=ON
+        -DCMAKE_CUDA_COMPILER="${CUDA_HOME}/bin/nvcc"
+        -DWITH_NVCUVID=OFF
+        -DWITH_NVCUVENC=OFF
+    )
+    ADDITIONAL_ARGS+=("${CUDA_ARGS[@]}")
     
     # err:
     #     error: ambiguous overload for ‘operator!=’ (operand types are ‘__half’ and ‘double’)
@@ -207,61 +220,55 @@ if [ $enable_cuda = "true" ]; then
     # cudacodec::VideoWriter requires Nvidia Video Codec SDK.  Please resolve
     # dependency or disable WITH_NVCUVENC=OFF
     # 
+    log_info "CUDA arguments: ${CUDA_ARGS[*]}"
 fi
 
 if [ "$enable_cudnn" = "true" ] && [ "$enable_cuda" = "true" ]; then
-    additonal_args+=" -DWITH_CUDNN=ON"
+    ADDITIONAL_ARGS+=(-DWITH_CUDNN=ON)
 fi
 
 if [ $enable_onnxruntime = "true" ]; then
     if [ ! -z "$ORT_INSTALL_DIR" ]; then
-        additonal_args+=" -DWITH_ONNX=ON -DONNXRT_ROOT_DIR=$ORT_INSTALL_DIR"
+        ADDITIONAL_ARGS+=(
+            -DWITH_ONNX=ON
+            -DONNXRT_ROOT_DIR="$ORT_INSTALL_DIR"
+        )
     else
-        log_fatal "onnxruntime not found, please set variable \"ORT_INSTALL_DIR\""
+        log_fatal "onnxruntime not found, please set variable 'ORT_INSTALL_DIR'"
     fi
 fi
 
 check_duplicate_cmake_args() {
-    local ARGS="${1:-}"
-    local formatted_args
-    local duplicate_keys=()
+    local args=("$@")  # 接收所有传入的参数作为数组
+    local key line value duplicate_entries=()
 
-    # 检查输入是否为空
-    if [ -z "$ARGS" ]; then
-        log_warn "No CMake arguments provided to check for duplicates."
-        return 0
-    fi
+    declare -A seen_keys  # 存储已见的 key => 行内容
 
-    # 格式化为每行一个参数，并过滤出 -Dxxx 类型
-    formatted_args=$(echo "$ARGS" | tr ' ' '\n' | grep -E '^[-]D[^=]+')
+    for arg in "${args[@]}"; do
+        if [[ "$arg" =~ ^-D([^=]+)=(.*) ]]; then
+            key="${BASH_REMATCH[1]}"
+            value="${BASH_REMATCH[2]}"
 
-    # 使用 awk 分析重复项并输出重复 key 到数组
-    while IFS= read -r line; do
-        duplicate_keys+=("$line")
-    done < <(
-        echo "$formatted_args" | awk -F= '
-        $0 ~ /^-D/ {
-            key = $1
-            count[key]++
-        }
-        count[key] == 2 {
-            print key
-        }'
-    )
+            if [[ -n "${seen_keys[$key]}" ]]; then
+                duplicate_entries+=("duplicate: -D${key}=..., first from: ${seen_keys[$key]}, second from: $arg")
+            else
+                seen_keys["$key"]="$arg"
+            fi
+        fi
+    done
 
-    # 判断是否有重复项
-    if [ ${#duplicate_keys[@]} -gt 0 ]; then
-        duplicate_key_str=""
-        for key in "${duplicate_keys[@]}"; do { duplicate_key_str+="$key "; } done
-        log_fatal "found duplicate CMake arguments: $duplicate_key_str"
+    if (( ${#duplicate_entries[@]} > 0 )); then
+        log_fatal "Found duplicate CMake arguments: ${duplicate_entries[*]}"
     fi
 }
 
-check_duplicate_cmake_args "$additonal_args"
+check_duplicate_cmake_args "${PYTHON_ARGS[@]}" "${ADDITIONAL_ARGS[@]}"
 
-log_info "OpenCV build additional args: $additonal_args"
+log_info "OpenCV build additional args: ${ADDITIONAL_ARGS[*]}"
+log_info "OpenCV build all args can be found in: '$build_dir/CMakeCache.txt', '$build_dir/CMakeVars.txt'"
 
 # ========= Build Setup ===================
+start_time=$(date +%s)
 mkdir -p "$build_dir"
 cd "$build_dir" || exit
 
@@ -281,10 +288,12 @@ if [ "$use_ninja" = true ]; then
     GENERATOR="-G Ninja"
 fi
 
-# -DOPENCV_DOWNLOAD_MIRROR_ID=gitcode \
+# # C++11 is default/required/recommended for OpenCV 4.x. C++17 is default/required/recomended for OpenCV 5.x.
+# -DCMAKE_CXX_STANDARD=17
 cmake "$GENERATOR" \
     -DCMAKE_INSTALL_PREFIX="$install_prefix" \
     -DOPENCV_EXTRA_MODULES_PATH="$contrib_dir/modules" \
+    -DCMAKE_CXX_STANDARD=17 \
     -DCMAKE_BUILD_TYPE=Release \
     -DOPENCV_GENERATE_PKGCONFIG=ON \
     -DBUILD_SHARED_LIBS=ON \
@@ -292,8 +301,8 @@ cmake "$GENERATOR" \
     -DBUILD_PACKAGE=ON \
     -DBUILD_opencv_apps=ON \
     -DBUILD_EXAMPLES=OFF \
-    -DPYTHON_DEFAULT_EXECUTABLE="$(which python3)" "$PYTHON3_ARGS" \
-    "$additonal_args" \
+    "${PYTHON_ARGS[@]}" \
+    "${ADDITIONAL_ARGS[@]}" \
     "$source_dir"
 
 if [ $? -ne 0 ]; then
@@ -315,9 +324,13 @@ fi
 
 # ========= Build & Install ===============
 if [ "$use_ninja" = true ]; then
-    ninja -j"${NUM_CORES}" && ninja install
+    ninja clean
+    ninja -j"${NUM_CORES}" 2>&1 | tee opencv-compile.log
+    ninja install 2>&1 | tee opencv-install.log
 else
-    make -j"${NUM_CORES}" && make install
+    make clean
+    make -j"${NUM_CORES}" 2>&1 | tee opencv-compile.log
+    make install 2>&1 | tee opencv-install.log
 fi
 
 if [ $? -ne 0 ]; then
