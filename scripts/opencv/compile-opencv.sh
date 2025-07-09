@@ -1,6 +1,8 @@
 #!/bin/bash
 set -e
 
+# https://github.com/Qengineering/Install-OpenCV-Jetson-Nano/blob/main/OpenCV-4-10-0.sh
+
 # OpenCV Get Started: https://opencv.org/get-started
 # Build from source
 #   - Linux: https://docs.opencv.org/master/d7/d9f/tutorial_linux_install.html
@@ -16,9 +18,7 @@ use_ninja=false
 enable_cuda=true
 enable_cudnn=true
 enable_onnxruntime=false
-force_3rdparty_build=true
-
-
+force_3rdparty_build=false
 
 # ========= log utils ==============
 DEFAULT=$(echo -en '\033[0m')
@@ -106,10 +106,10 @@ checkout_opencv_repo() {
 }
 
 echo "Cloning and checking out OpenCV..."
-checkout_opencv_repo "https://github.com/opencv/opencv.git " "$source_dir" "$VERSION"
+checkout_opencv_repo "https://github.com/opencv/opencv.git" "$source_dir" "$VERSION"
 
 echo "Cloning and checking out OpenCV Contrib..."
-checkout_opencv_repo "https://github.com/opencv/opencv_contrib.git " "$contrib_dir" "$VERSION"
+checkout_opencv_repo "https://github.com/opencv/opencv_contrib.git" "$contrib_dir" "$VERSION"
 
 # ========= Opencv CMake Args ====================
 # -DWITH_HPX=ON # 会报错
@@ -149,6 +149,7 @@ ADDITIONAL_ARGS=(
     -DWITH_CANN=ON
     -DWITH_ZLIB_NG=ON
 )
+ADDITIONAL_ARGS=()
 
 # ENABLE_CCACHE
 
