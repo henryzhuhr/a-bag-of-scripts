@@ -19,6 +19,7 @@ enable_cuda=true
 enable_cudnn=true
 enable_onnxruntime=false
 force_3rdparty_build=false
+NUM_CORES=${NUM_CORES:-}  # 可通过环境变量传入，如 NUM_CORES=8 ./compile-opencv.sh
 
 # ========= log utils ==============
 DEFAULT=$(echo -en '\033[0m')
@@ -297,16 +298,21 @@ if [ $? -ne 0 ]; then
 fi
 
 # ========= CPU Core Detection ============
-if [ "$(uname)" = "Darwin" ]; then
-    NUM_CORES=$(sysctl -n hw.ncpu)
-    # For M1/M2 Macs, use specific optimization flags
-    if [[ "$(uname -m)" == "arm64" ]]; then
-        export CXXFLAGS="-DFORCE_ARM64 -mcpu=native"
+if [ -z "$NUM_CORES" ]; then
+    if [ "$(uname)" = "Darwin" ]; then
+        NUM_CORES=$(sysctl -n hw.ncpu)
+        # For M1/M2 Macs, use specific optimization flags
+        if [[ "$(uname -m)" == "arm64" ]]; then
+            export CXXFLAGS="-DFORCE_ARM64 -mcpu=native"
+        fi
+    elif [ "$(expr substr $(uname -s) 1 5)" = "Linux" ]; then
+        NUM_CORES=$(nproc --all)
+    else
+        NUM_CORES=1
     fi
-elif [ "$(expr substr $(uname -s) 1 5)" = "Linux" ]; then
-    NUM_CORES=$(nproc --all)
+    log_info "Auto-detected CPU cores: $NUM_CORES"
 else
-    NUM_CORES=1
+    log_info "Using user-specified CPU cores: $NUM_CORES"
 fi
 
 # ========= Build & Install ===============
