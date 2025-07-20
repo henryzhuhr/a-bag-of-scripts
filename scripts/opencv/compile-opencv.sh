@@ -1,5 +1,5 @@
 #!/bin/bash
-set -e
+set -e -o pipefail
 
 # https://github.com/Qengineering/Install-OpenCV-Jetson-Nano/blob/main/OpenCV-4-10-0.sh
 
@@ -42,50 +42,23 @@ cd "$project_dir" || exit
 source_dir="$project_dir/opencv"
 contrib_dir="$project_dir/opencv_contrib"
 build_dir="/tmp/opencv-build"
-build_dir="$project_dir/opencv/build"
 install_prefix="$install_dir/opencv-$VERSION"
+
+# # ========= check ===============
+# if [ "$(uname)" = "Linux" ]; then
+#     if [ "$(basename "$SHELL")" != "bash" ]; then
+#         log_fatal "Please use bash instead of $(basename "$SHELL"), 'chsh -s /bin/bash'"
+#     fi 
+# elif [ "$(uname)" = "Darwin" ]; then
+#     if [ "$(basename "$SHELL")" != "zsh" ]; then
+#         log_fatal "Please use zsh instead of $(basename "$SHELL"), 'chsh -s /bin/zsh'"
+#     fi
+# else 
+#     log_fatal "Not support platform, maybe Windows."
+# fi
 
 
 # ========= Git Clone & Checkout ==========
-
-# # 检出 OpenCV 主仓库
-# if [ ! -d "$source_dir" ]; then
-#     git clone https://github.com/opencv/opencv.git  "$source_dir"
-# fi
-
-# if [ ! -d "$source_dir" ]; then
-#     echo "error: opencv source not found in $source_dir"
-#     exit 1
-# fi
-
-# cd "$source_dir" || exit 1
-
-# # 先检查是否已经存在名为 $VERSION 的分支或标签
-# if git rev-parse --verify $VERSION > /dev/null 2>&1; then
-#     git checkout $VERSION
-# else
-#     git checkout tags/$VERSION -b $VERSION
-# fi
-
-# # 检出 OpenCV Contrib 仓库
-# if [ ! -d "$contrib_dir" ]; then
-#     git clone https://github.com/opencv/opencv_contrib.git  "$contrib_dir"
-# fi
-
-# if [ ! -d "$contrib_dir" ]; then
-#     echo "error: opencv_contrib source not found in $contrib_dir"
-#     exit 1
-# fi
-
-# cd "$contrib_dir" || exit 1
-
-# # 同样的逻辑处理 contrib 仓库
-# if git rev-parse --verify $VERSION > /dev/null 2>&1; then
-#     git checkout $VERSION
-# else
-#     git checkout tags/$VERSION -b $VERSION
-# fi
-
 checkout_opencv_repo() {
     local repo_url="$1"
     local repo_dir="$2"
@@ -180,6 +153,14 @@ log_info "Python arguments: ${PYTHON_ARGS[*]}"
 # ========= Opencv CMake Args: CUDA Support ================
 # https://docs.opencv.org/4.x/d2/dbc/cuda_intro.html
 if [ $enable_cuda = "true" ]; then
+    # 检查 nvcc 命令是否存在
+    if ! command -v nvcc &> /dev/null; then
+        log_fatal "CUDA compiler (nvcc) not found. Please install CUDA toolkit and ensure nvcc is in your PATH."
+    fi
+    # 检查是否有 CUDA_HOME 变量，并且 CUDA_HOME/bin/nvcc 存在
+    if [ -z "$CUDA_HOME" ] || [ ! -x "$CUDA_HOME/bin/nvcc" ]; then
+        log_fatal "CUDA_HOME is not set or nvcc not found. Please set CUDA_HOME to your CUDA installation directory."
+    fi
     GPU_ARCH=$(nvidia-smi --query-gpu=compute_cap --format=csv,noheader | awk '{print $1}' | head -n1 | tr '.' ' ')
     CUDA_ARCH_BIN=$(echo "$GPU_ARCH" | awk '{printf "%.1f", $1 + 0.0}')
     # Specify 'virtual' PTX architectures to build PTX intermediate
@@ -190,17 +171,19 @@ if [ $enable_cuda = "true" ]; then
     log_info "Setting CUDA_ARCH_BIN to: $CUDA_ARCH_BIN"
     log_info "Setting CUDA_ARCH_PTX to: $CUDA_ARCH_PTX"
 
-    CUDA_ARGS="-DWITH_CUDA=ON -DOPENCV_DNN_CUDA=ON"
     # https://github.com/opencv/opencv/issues/25215
     # depends on -DBUILD_TIFF=ON in jetson
     # -DCUDA_GENERATION=Auto = -DCUDA_ARCH_BIN=${CUDA_ARCH_BIN} -DCUDA_ARCH_PTX=${CUDA_ARCH_PTX}
-    CUDA_ARGS+=(
+    # 
+    # 禁用 CUDA 光流模块 (cudaoptflow)，避免编译失败
+    # -DBUILD_opencv_cudaoptflow=OFF
+    CUDA_ARGS=(
         -DWITH_CUDA=ON
         -DCUDA_GENERATION=Auto
-        -DOPENCV_DNN_CUDA=ON
         -DCMAKE_CUDA_COMPILER="${CUDA_HOME}/bin/nvcc"
         -DWITH_NVCUVID=OFF
         -DWITH_NVCUVENC=OFF
+        -DBUILD_opencv_cudaoptflow=OFF
     )
     ADDITIONAL_ARGS+=("${CUDA_ARGS[@]}")
     
@@ -225,11 +208,11 @@ if [ $enable_cuda = "true" ]; then
 fi
 
 if [ "$enable_cudnn" = "true" ] && [ "$enable_cuda" = "true" ]; then
-    ADDITIONAL_ARGS+=(-DWITH_CUDNN=ON)
+    ADDITIONAL_ARGS+=(-DWITH_CUDNN=ON -DOPENCV_DNN_CUDA=ON)
 fi
 
 if [ $enable_onnxruntime = "true" ]; then
-    if [ ! -z "$ORT_INSTALL_DIR" ]; then
+    if [ -n "$ORT_INSTALL_DIR" ]; then
         ADDITIONAL_ARGS+=(
             -DWITH_ONNX=ON
             -DONNXRT_ROOT_DIR="$ORT_INSTALL_DIR"
@@ -270,6 +253,9 @@ log_info "OpenCV build all args can be found in: '$build_dir/CMakeCache.txt', '$
 
 # ========= Build Setup ===================
 start_time=$(date +%s)
+if [ -d "$build_dir" ]; then
+    rm -rf "$build_dir"
+fi
 mkdir -p "$build_dir"
 cd "$build_dir" || exit
 
@@ -325,17 +311,21 @@ fi
 
 # ========= Build & Install ===============
 if [ "$use_ninja" = true ]; then
-    ninja clean
-    ninja -j"${NUM_CORES}" 2>&1 | tee opencv-compile.log
-    ninja install 2>&1 | tee opencv-install.log
+    ninja clean || true
+    if ! ninja -j"${NUM_CORES}" 2>&1 | tee opencv-compile.log; then
+        log_fatal "build failed, please check '$build_dir/opencv-compile.log' for details"
+    fi
+    if ! ninja install 2>&1 | tee opencv-install.log; then
+        log_fatal "install failed, please check '$build_dir/opencv-install.log' for details"
+    fi
 else
-    make clean
-    make -j"${NUM_CORES}" 2>&1 | tee opencv-compile.log
-    make install 2>&1 | tee opencv-install.log
-fi
-
-if [ $? -ne 0 ]; then
-    log_fatal "Build failed, please check the output for errors."
+    make clean || true
+    if ! make -j"${NUM_CORES}" 2>&1 | tee opencv-compile.log; then
+        log_fatal "build failed, please check '$build_dir/opencv-compile.log' for details"
+    fi
+    if ! make install 2>&1 | tee opencv-install.log; then
+        log_fatal "install failed, please check '$build_dir/opencv-install.log' for details"
+    fi
 fi
 
 # ========= Cleanup Build Dir =============
@@ -344,8 +334,9 @@ if [ "$clean_build_cache" = "true" ]; then
 fi
 
 # ========= Set Env Variables =============
-if ! grep -q "OpenCV_HOME" ~/.bashrc; then
-    cat << EOF >> ~/.bashrc
+usershell=$(basename "$(getent passwd "$USER" | cut -d: -f7)")
+if ! grep -q "OpenCV_HOME" ~/."${usershell}"rc; then
+    cat << EOF >> ~/."${usershell}"rc
 
 # OpenCV environment variables
 export OpenCV_HOME=${install_prefix}
@@ -353,9 +344,9 @@ export OpenCV_DIR=\$OpenCV_HOME/lib/cmake
 export PATH=\$OpenCV_HOME/bin:\$PATH
 export LD_LIBRARY_PATH=\$OpenCV_HOME/lib:\$LD_LIBRARY_PATH
 EOF
-    echo "[INFO] OpenCV environment variables added to ~/.bashrc"
+    echo "[INFO] OpenCV environment variables added to ~/.${usershell}rc"
 else
-    echo "[INFO] OpenCV environment variables already exist in ~/.bashrc"
+    echo "[INFO] OpenCV environment variables already exist in ~/.${usershell}rc"
 fi
 
 # ========= Create Symlink ================
