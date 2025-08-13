@@ -1,5 +1,5 @@
 """
-python3 -m pip install exifread pillow-heif piexif
+重命名 RAW 照片
 """
 
 import argparse
