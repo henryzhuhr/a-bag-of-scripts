@@ -56,6 +56,9 @@ class TaskManager:
             raise ValueError(f"任务 '{name}' 未注册。")
         return task.execute(dry_run=dry_run)
 
+    def execute_with_confirm(self, name: str, dry_run: bool = False) -> Any:
+        pass
+
     def list_tasks(self) -> Dict[str, BaseTask]:
         """
         列出所有已注册任务。

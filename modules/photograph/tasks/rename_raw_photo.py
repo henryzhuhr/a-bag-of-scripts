@@ -76,17 +76,20 @@ class RenameRawPhotoTask(BaseTask):
         rename_list: List[RenameItem] = []
         for _, task in enumerate(self.process_task_list):
             if task.skip:
-                logger.debug(
+                logger.info(
                     f"file '{task.parent_dir}/{task.origin_file}' has been renamed, skip"
                 )
                 continue
-            logger.debug(
+            logger.info(
                 f"file is to be renamed: {task.parent_dir} / '{task.origin_file}' -> '{task.update_file}'"
             )
             rename_list.append(
                 RenameItem(task.parent_dir, task.origin_file, task.update_file)
             )
-        if not dry_run:
+        if len(rename_list) == 0:
+            logger.info(f"no files to rename for task [{self.config.name}]")
+            return
+        if not dry_run and self.confirm():
             for item in rename_list:
                 try:
                     # 检查源文件是否存在
@@ -127,6 +130,10 @@ class RenameRawPhotoTask(BaseTask):
                     heif_file = pillow_heif.open_heif(file_path)
                     exif_dict = piexif.load(heif_file.info["exif"], key_is_name=True)
                     exif_data = exif_dict["Exif"]
+                    if exif_data is None:
+                        raise ValueError(
+                            "metadata 'Exif' not found in file '{file_path}'"
+                        )
                     date_time = exif_data["DateTimeOriginal"]
                     date_time = str(date_time, "utf-8")
                 else:
