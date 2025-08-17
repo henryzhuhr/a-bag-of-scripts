@@ -15,7 +15,7 @@ from pkg._types.photo import FileTag
 from utils.xphoto import XPhoto
 
 # ================== 目录路径设置 ==================
-BD = PhotographDir.ICLOUD_PANO_LOCAL
+BD = PhotographDir.ICLOUD_RAW_PANO
 """基本目录 base dir"""
 
 
@@ -101,7 +101,7 @@ def main():
         if not args.execute_confirm:
             run_task(task_list)
         else:
-            incorrect_input_str: str = None
+            incorrect_input_str: typing.Optional[str] = None
 
             execute_cnt = 0
             while True:

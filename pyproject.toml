@@ -1,22 +1,23 @@
 [project]
-name = "common-scripts"
+name = "a-bag-of-scripts"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.10,<3.13"
 dependencies = [
-    "exifread>=3.3.0",
+    "exifread>=3.4.0",
     "loguru>=0.7.3",
     "piexif>=1.1.3",
-    "pillow>=11.2.1",
-    "pillow-heif>=0.22.0",
-    "pydantic>=2.11.4",
+    "pillow>=11.3.0",
+    "pillow-heif>=1.1.0",
+    "pydantic>=2.11.7",
+    "pytest>=8.4.1",
     "pyyaml>=6.0.2",
 ]
 
 [[tool.uv.index]]
-url = "https://mirrors.cloud.tencent.com/pypi/simple/"
-default = true
+url = "https://mirrors.ustc.edu.cn/pypi/simple"
 
 [[tool.uv.index]]
-url = "https://mirrors.ustc.edu.cn/pypi/simple"
+url = "https://mirrors.cloud.tencent.com/pypi/simple/"
+default = true
