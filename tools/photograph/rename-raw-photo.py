@@ -26,8 +26,8 @@ BASE_DIR = PhotographDir.ICLOUD_RAW_PHOTO
 FILE_TAG_LIST: typing.List[FileTag] = [
     # fmt: off
     # FileTag(tag="相册名称", dir=f"{BASE_DIR}/YYMMDD-相册名称"),
-    FileTag(tag="SZX深圳宝安国际机场", dir=f"{BASE_DIR}/250726-SZX深圳宝安国际机场"),
-    FileTag(tag="CAN广州白云国际机场", dir=f"{BASE_DIR}/250727-CAN广州白云国际机场"),
+    FileTag(tag="深圳市天文台", dir=f"{BASE_DIR}/250816-深圳市天文台"),
+    FileTag(tag="深圳盐田港", dir=f"{BASE_DIR}/250816-深圳盐田港"),
     # fmt: on
 ]
 

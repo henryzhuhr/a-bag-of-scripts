@@ -10,32 +10,30 @@ class TaskManager:
     任务管理器：用于注册、管理和执行任务。
     """
 
+    _tasks: Dict[str, BaseTask]
+    """已注册的任务实例字典"""
+
     def __init__(self):
-        self._tasks: Dict[str, BaseTask] = {}
+        self._tasks = {}
         self._task_types: Dict[str, Type[BaseTask]] = {}
 
-    def register_task_type(self, name: str, task_cls: Type[BaseTask]):
+    @property
+    def tasks(self) -> Dict[str, BaseTask]:
         """
-        注册任务类型。
-        :param name: 任务类型名称
-        :param task_cls: 任务类
+        获取已注册的任务实例字典。
+        :return: 任务实例字典
         """
-        self._task_types[name] = task_cls
+        return self._tasks
 
-    def create_task(
-        self, name: str, config: Optional[Dict[str, Any]] = None
-    ) -> BaseTask:
+    def register_task(self, task: BaseTask):
         """
-        根据类型创建任务实例并注册。
-        :param name: 任务类型名称
-        :param config: 任务配置
-        :return: 任务实例
+        注册任务
         """
-        if name not in self._task_types:
-            raise ValueError(f"未注册的任务类型: {name}")
-        task = self._task_types[name](config)
-        self._tasks[name] = task
-        return task
+        if not isinstance(task, BaseTask):
+            raise TypeError(
+                f"task must be an instance of BaseTask, but got: {type(task).__name__}"
+            )
+        self._tasks[task.name()] = task
 
     def get_task(self, name: str) -> Optional[BaseTask]:
         """
@@ -45,18 +43,7 @@ class TaskManager:
         """
         return self._tasks.get(name)
 
-    def describe_task(self, name: str) -> str:
-        """
-        获取任务描述。
-        :param name: 任务名称
-        :return: 描述字符串
-        """
-        task = self.get_task(name)
-        if not task:
-            return f"任务 '{name}' 未注册。"
-        return task.describe()
-
-    def execute_task(self, name: str, dry_run: bool = False) -> Any:
+    def execute(self, name: str, dry_run: bool = False) -> Any:
         """
         执行指定任务。
         :param name: 任务名称

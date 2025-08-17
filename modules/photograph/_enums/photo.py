@@ -30,6 +30,26 @@ class PhotographDir(StrEnum):
     """iCloud 原始全景照片目录"""
 
 
+class SupportedPhotoRawExt(StrEnum):
+    DNG = ".dng"
+    """通用数字负片格式"""
+
+    ARW = ".arw"
+    """索尼相机 RAW 格式"""
+
+    RAF = ".raf"
+    """富士相机 RAW 格式"""
+
+
+class SupportedPhotoHeifExt(StrEnum):
+    HEIF = ".heif"
+    """高效图像格式"""
+    HEIC = ".heic"
+    """高效图像格式（HEIC）"""
+    HIF = ".hif"
+    """高效图像格式（HIF）"""
+
+
 class ExifImageMake(StrEnum):
     """相机制造商枚举"""
 
