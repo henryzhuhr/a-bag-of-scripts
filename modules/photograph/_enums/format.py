@@ -39,6 +39,13 @@ class PhotoFormat(StrEnum):
     """索尼 RAW"""
 
 
+class XMPFormat(StrEnum):
+    """XMP 文件格式"""
+
+    XMP = ".xmp"
+    """XMP 文件格式"""
+
+
 EXIF_SUPPORTED_FILE_EXT = [
     PhotoFormat.SONY_RAW,
     PhotoFormat.DNG,

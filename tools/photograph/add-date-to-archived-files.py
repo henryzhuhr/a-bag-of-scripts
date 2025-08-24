@@ -1,6 +1,6 @@
 """
 为归档文件添加修改日期
-add-modified-date-to-archived-files
+add-date-to-archived-files
 """
 
 import argparse
@@ -189,10 +189,8 @@ def byte2GB(byte: int):
 
 def ts2str(timestamp: float):
     """time stamp -> str"""
-    year = time.strftime("%Y", time.localtime(timestamp))
-    format_str = time.strftime("%m%d_%H%M%S", time.localtime(timestamp))
-    return f"{year[2:]}{format_str}"
-    return time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(timestamp))
+    format_str = time.strftime("%Y%m%d_%H%M%S", time.localtime(timestamp))
+    return f"{format_str}"
 
 
 if __name__ == "__main__":

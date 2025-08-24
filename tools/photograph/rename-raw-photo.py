@@ -4,7 +4,7 @@
 
 from venv import logger
 
-from modules.photograph._enums.photo import PhotographDir
+from modules.photograph._enums.photo import PhotographDir as PD
 from modules.photograph._types.photo import FileTag
 from modules.photograph.tasks.rename_raw_photo import (
     RenameRawPhotoTask,
@@ -13,14 +13,14 @@ from modules.photograph.tasks.rename_raw_photo import (
 from modules.task.task_manager import TaskManager
 
 TASK_NAME = "rename-raw-photo"
+"/Users/henryzhu/Library/Mobile Documents/com~apple~CloudDocs/TimeLapse-Raw"
+
+FILE_TAG_LIST = [
+    FileTag(tag="XXXX", dir=f"{PD.ICLOUD_RAW_PHOTO}/200101-XXXX_副本"),
+]
 
 
 def main():
-    BASE_DIR = PhotographDir.ICLOUD_RAW_PHOTO
-    FILE_TAG_LIST = [
-        FileTag(tag="XXXX", dir=f"{BASE_DIR}/200101-XXXX_副本"),
-    ]
-
     config = RenameRawPhotoTaskConfig(name=TASK_NAME, file_tag_list=FILE_TAG_LIST)
     manager = TaskManager()
     task = RenameRawPhotoTask(config)
