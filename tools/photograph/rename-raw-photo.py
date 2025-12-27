@@ -13,10 +13,9 @@ from modules.photograph.tasks.rename_raw_photo import (
 from modules.task.task_manager import TaskManager
 
 TASK_NAME = "rename-raw-photo"
-"/Users/henryzhu/Library/Mobile Documents/com~apple~CloudDocs/TimeLapse-Raw"
-
+BD = PD.ICLOUD_RAW_PHOTO
 FILE_TAG_LIST = [
-    FileTag(tag="XXXX", dir=f"{PD.ICLOUD_RAW_PHOTO}/200101-XXXX_副本"),
+    # FileTag(tag="XXXX", dir=f"{BD}/200101-XXXX_副本"),
 ]
 
 

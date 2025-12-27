@@ -27,7 +27,7 @@ class DefaultArgs:
                 f"{PhotographDir.ICLOUD_RAW_PHOTO}",  # 照片 原始
                 # f"{PhotographDir.ICLOUD_RAW_TIMELAPSE_PHOTO}",  ## 延时 原始
                 # f"{PhotographDir.ICLOUD_RAW_PANO}",  ### 全景 原始
-                # f"{PhotographDir.ICLOUD_RAW_PHOTO}",  ### 视频 原始
+                # f"{PhotographDir.ICLOUD_RAW_VIDEO}",  ### 视频 原始
             ][-1],
             help="需要处理的文件夹",
         )
@@ -138,6 +138,7 @@ def main():  # noqa: C901
         file_str_max_len = max(file_str_max_len, len(file))
         file_modify_str_max_len = max(file_modify_str_max_len, len(file_with_time))
         process_task_list.append(ProcessTask(args.dir, file, file_with_time, file_size))
+        print(args.dir, file, file_with_time)
 
     def execute_process_task():
         """执行的任务"""
@@ -158,9 +159,8 @@ def main():  # noqa: C901
         logger.info("是否执行如下的重命名操作")
         for i, task in enumerate(process_task_list):
             format_str = f"{task.file.ljust(file_str_max_len)} -> {task.file_modify.ljust(file_modify_str_max_len)}"
-            logger.info(
-                str(i).rjust(3), str(f"{task.sizeGB:.2f}(G)").rjust(8), format_str
-            )
+            size_str = str(f"{task.sizeGB:.2f}(G)").rjust(8)
+            logger.info(f"index:{str(i).rjust(3)}, {size_str}, {format_str}")
         incorrect_input_str: Optional[str] = None
         while True:
             tip_info = (
