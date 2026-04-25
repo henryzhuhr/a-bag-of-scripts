@@ -17,19 +17,19 @@ class PhotographDir(StrEnum):
     LOCAL_DIR = _INTERNAL_LOCAL_DIR
     """本地目录"""
 
-    ICLOUD_RAW_PHOTO = f"{ICLOUD_DIR}/Photograph-Raw"
+    ICLOUD_RAW_PHOTO = f"{ICLOUD_DIR}/Photograph/Photograph-Raw"
     """iCloud 原始照片目录"""
 
     LOCAL_RAW_PHOTO = f"{LOCAL_DIR}/Photograph-Raw"
     """本地原始照片目录"""
 
-    ICLOUD_RAW_VIDEO = f"{ICLOUD_DIR}/Video-Raw"
+    ICLOUD_RAW_VIDEO = f"{ICLOUD_DIR}/Photograph/Video-Raw"
     """iCloud 原始视频目录"""
 
-    ICLOUD_RAW_TIMELAPSE_PHOTO = f"{ICLOUD_DIR}/TimeLapse-Raw"
+    ICLOUD_RAW_TIMELAPSE_PHOTO = f"{ICLOUD_DIR}/Photograph/TimeLapse-Raw"
     """iCloud 原始照片目录"""
 
-    ICLOUD_RAW_PANO = f"{ICLOUD_DIR}/Panorama-Raw"
+    ICLOUD_RAW_PANO = f"{ICLOUD_DIR}/Photograph/Panorama-Raw"
     """iCloud 原始全景照片目录"""
 
 
