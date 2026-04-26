@@ -31,6 +31,8 @@ class PhotoFormat(StrEnum):
 
     PNG = ".png"
 
+    TIF = ".tif"
+
     TIFF = ".tiff"
 
     DNG = ".dng"
@@ -46,12 +48,24 @@ class XMPFormat(StrEnum):
     """XMP 文件格式"""
 
 
+class SidecarFormat(StrEnum):
+    """照片附属文件格式"""
+
+    XMP = ".xmp"
+    """XMP 附属文件格式"""
+
+    ACR = ".acr"
+    """Adobe Camera Raw 附属文件格式"""
+
+
 EXIF_SUPPORTED_FILE_EXT = [
     PhotoFormat.SONY_RAW,
     PhotoFormat.DNG,
     # ".raf",# 富士
     PhotoFormat.JPG,
     PhotoFormat.JPEG,
+    PhotoFormat.TIF,
+    PhotoFormat.TIFF,
 ]
 
 HEIF_SUPPORTED_FILE_EXT = [".heif", ".heic", ".hif"]

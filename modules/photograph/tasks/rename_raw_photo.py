@@ -3,16 +3,22 @@
 """
 
 import os
-from typing import List
+from typing import List, Optional
 
-import exifread
-import piexif
-import pillow_heif
 from loguru import logger
 from pydantic import ConfigDict, Field
 
-from modules.photograph._enums.format import PhotoFormat, XMPFormat
+from modules.photograph._enums.format import SidecarFormat, XMPFormat
 from modules.photograph._enums.photo import SupportedPhotoHeifExt, SupportedPhotoRawExt
+from modules.photograph.metadata_plugins import (
+    DEFAULT_ENTRY_POINT_GROUP,
+    PhotoMetadataPlugin,
+    PhotoMetadataPluginRegistry,
+    default_metadata_plugins,
+    load_plugins_from_entry_points,
+    load_plugins_from_module_paths,
+    normalize_extension,
+)
 from modules.photograph._types.photo import FileTag
 from modules.task.task import BaseTask, BaseTaskConfig
 
@@ -43,6 +49,36 @@ class RenameRawPhotoTaskConfig(BaseTaskConfig):
     )
     """支持的 HEIF 文件扩展名"""
 
+    metadata_plugins: Optional[List[PhotoMetadataPlugin]] = Field(
+        default=None,
+        description="显式传入的元数据插件。为空时使用内置默认插件",
+    )
+    """显式传入的元数据插件"""
+
+    metadata_plugin_modules: List[str] = Field(
+        default_factory=list,
+        description="显式加载的元数据插件模块路径",
+    )
+    """显式加载的元数据插件模块路径"""
+
+    load_entry_point_plugins: bool = Field(
+        default=False,
+        description="是否加载 Python entry points 中的元数据插件",
+    )
+    """是否加载 Python entry points 中的元数据插件"""
+
+    metadata_plugin_entry_point_group: str = Field(
+        default=DEFAULT_ENTRY_POINT_GROUP,
+        description="元数据插件 entry point group",
+    )
+    """元数据插件 entry point group"""
+
+    ignored_extensions: List[str] = Field(
+        default_factory=lambda: [SidecarFormat.XMP.value, SidecarFormat.ACR.value],
+        description="扫描时忽略的附属文件扩展名",
+    )
+    """扫描时忽略的附属文件扩展名"""
+
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
 
@@ -57,6 +93,7 @@ class RenameRawPhotoTask(BaseTask):
     def __init__(self, config: RenameRawPhotoTaskConfig):
         super().__init__(config)
         self.config = config
+        self._metadata_plugin_registry = self._build_metadata_plugin_registry()
         self.process_tasks: List[ProcessTask] = self._find_all_files()
         """处理任务列表"""
 
@@ -65,6 +102,36 @@ class RenameRawPhotoTask(BaseTask):
 
     def describe(self) -> str:
         return f"task [{self.config.name}] with {len(self.process_tasks)} files to process."
+
+    @property
+    def process_task_list(self) -> List[ProcessTask]:
+        """兼容旧调用方，内部统一使用 process_tasks。"""
+        return self.process_tasks
+
+    def _build_metadata_plugin_registry(self) -> PhotoMetadataPluginRegistry:
+        metadata_plugins = self.config.metadata_plugins
+        if metadata_plugins is None:
+            metadata_plugins = default_metadata_plugins(
+                self.config.exif_supported_ext,
+                self.config.heif_supported_ext,
+            )
+        else:
+            metadata_plugins = list(metadata_plugins)
+
+        metadata_plugins.extend(
+            load_plugins_from_module_paths(self.config.metadata_plugin_modules)
+        )
+        if self.config.load_entry_point_plugins:
+            metadata_plugins.extend(
+                load_plugins_from_entry_points(
+                    self.config.metadata_plugin_entry_point_group
+                )
+            )
+
+        return PhotoMetadataPluginRegistry(
+            metadata_plugins,
+            ignored_extensions=self.config.ignored_extensions,
+        )
 
     def execute(self, dry_run: bool = False):
         logger.info(f"start executing task [{self.config.name}]，dry_run={dry_run}")
@@ -115,7 +182,7 @@ class RenameRawPhotoTask(BaseTask):
         # 遍历文件夹
         for file_tag in self.config.file_tag_list:
             # 遍历文件
-            for file in os.listdir(file_tag.dir):
+            for file in sorted(os.listdir(file_tag.dir)):
                 file_tag_items.append(FileTagItem(file, file_tag))
 
         # 拆开两个逻辑的目的是为了避免文件夹不存在或者其他文件系统的错误
@@ -135,37 +202,16 @@ class RenameRawPhotoTask(BaseTask):
         file_base, file_ext = os.path.splitext(file)
         file_path = os.path.join(file_tag.dir, file)
 
-        # 检查文件类型是否支持
-        # 解析 exif 信息
-        date_time = None
-        if file_ext.lower() in self.config.exif_supported_ext:
-            with open(file_path, "rb") as f:
-                exif_data = exifread.process_file(f, details=False, strict=True)
-                date_time = exif_data["EXIF DateTimeOriginal"].printable
-        elif file_ext.lower() in self.config.heif_supported_ext:
-            # reference from: https://github.com/bigcat88/pillow_heif/blob/master/examples/heif_dump_info.py
-            heif_file = pillow_heif.open_heif(file_path)
-            exif_dict = piexif.load(heif_file.info["exif"], key_is_name=True)
-            exif_data = exif_dict["Exif"]
-            if exif_data is None:
-                raise ValueError("metadata 'Exif' not found in file '{file_path}'")
-            date_time = exif_data["DateTimeOriginal"]
-            date_time = str(date_time, "utf-8")
-        elif file_ext.lower() in [
-            XMPFormat.XMP,
-        ]:
+        normalized_ext = normalize_extension(file_ext)
+        if self._metadata_plugin_registry.is_ignored(normalized_ext):
             return []
-        elif file_ext.lower() in [
-            PhotoFormat.JPG,
-            PhotoFormat.JPEG,
-        ]:
-            with open(file_path, "rb") as f:
-                exif_data = exifread.process_file(f, details=False, strict=True)
-                date_time = exif_data["EXIF DateTimeOriginal"].printable
-        else:
+
+        metadata_plugin = self._metadata_plugin_registry.find(normalized_ext)
+        if metadata_plugin is None:
             raise ValueError(
                 f"unsupported file type '{file_ext}' for file '{file_path}'"
             )
+        date_time = metadata_plugin.read_original_datetime(file_path)
 
         file_date, file_time = date_time.split(" ")
         file_date = file_date.replace(":", "")  # 年月日
@@ -195,9 +241,7 @@ class RenameRawPhotoTask(BaseTask):
             )
         ]
 
-        # 检查 RAW 文件是否存在附属文件(xmp)
-        if self._may_have_xmp(file):
-            ext = XMPFormat.XMP.value
+        for ext in metadata_plugin.sidecar_extensions:
             attached_file = f"{file_base}{ext}"
             file_path = os.path.join(file_tag.dir, attached_file)
             if os.path.exists(file_path) and (
@@ -215,14 +259,12 @@ class RenameRawPhotoTask(BaseTask):
         return file_tasks
 
     def _may_have_xmp(self, file: str) -> bool:
-        """判断文件是否可能包含 xmp 文件"""
-        raw_list: List[str] = []
-        for e in SupportedPhotoRawExt:
-            # DNG 不需要 xmp 文件，其中包含所有信息
-            # if e.value == SupportedPhotoRawExt.DNG:
-            #     continue
-            raw_list.append(str(e.value))
-        return any(file.lower().endswith(ext) for ext in raw_list)
+        """兼容旧内部逻辑：判断文件是否可能包含 xmp 文件。"""
+        _, file_ext = os.path.splitext(file)
+        metadata_plugin = self._metadata_plugin_registry.find(file_ext)
+        if metadata_plugin is None:
+            return False
+        return XMPFormat.XMP.value in metadata_plugin.sidecar_extensions
 
     def _get_fileid(self, file_base: str, file_time: str):
         file_base_list = str(file_base).split("-")
