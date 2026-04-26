@@ -6,8 +6,9 @@ from pathlib import Path
 
 import pytest
 
-from modules.photograph import metadata_plugins as metadata_plugin_module
-from modules.photograph.metadata_plugins import (
+from modules.photograph.plugins import metadata as metadata_plugin_module
+from modules.photograph.plugins.metadata import builtin as builtin_plugin_module
+from modules.photograph.plugins.metadata import (
     MetadataPluginError,
     PhotoMetadataPlugin,
 )
@@ -48,14 +49,14 @@ class DummyMetadataPlugin(PhotoMetadataPlugin):
 @pytest.fixture(autouse=True)
 def mock_builtin_metadata(monkeypatch):
     monkeypatch.setattr(
-        metadata_plugin_module.exifread, "process_file", mock_exifread_process_file
+        builtin_plugin_module.exifread, "process_file", mock_exifread_process_file
     )
     monkeypatch.setattr(
-        metadata_plugin_module.pillow_heif,
+        builtin_plugin_module.pillow_heif,
         "open_heif",
         mock_pillow_heif_open_heif,
     )
-    monkeypatch.setattr(metadata_plugin_module.piexif, "load", mock_piexif_load)
+    monkeypatch.setattr(builtin_plugin_module.piexif, "load", mock_piexif_load)
 
 
 @pytest.fixture
@@ -153,7 +154,7 @@ def test_metadata_plugin_module_loading(monkeypatch, tmp_path, photo_dir):
     plugin_module.write_text(
         "\n".join(
             [
-                "from modules.photograph.metadata_plugins import PhotoMetadataPlugin",
+                "from modules.photograph.plugins.metadata import PhotoMetadataPlugin",
                 "class BarPlugin(PhotoMetadataPlugin):",
                 "    def read_original_datetime(self, file_path: str) -> str:",
                 "        return '2023:08:17 12:34:56'",
@@ -238,3 +239,9 @@ def test_execute_renames_only_temp_files(monkeypatch, photo_dir):
     assert (photo_dir / f"{EXPECTED_BASE}.ARW").read_bytes() == b"RAW DATA"
     assert (photo_dir / f"{EXPECTED_BASE}.xmp").read_bytes() == b"xmp data"
     assert (photo_dir / f"{EXPECTED_BASE}.acr").read_bytes() == b"acr data"
+
+
+def test_legacy_metadata_plugins_import_path_is_supported():
+    from modules.photograph.metadata_plugins import PhotoMetadataPlugin as LegacyPlugin
+
+    assert LegacyPlugin is PhotoMetadataPlugin

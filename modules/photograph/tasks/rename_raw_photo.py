@@ -10,7 +10,7 @@ from pydantic import ConfigDict, Field
 
 from modules.photograph._enums.format import SidecarFormat, XMPFormat
 from modules.photograph._enums.photo import SupportedPhotoHeifExt, SupportedPhotoRawExt
-from modules.photograph.metadata_plugins import (
+from modules.photograph.plugins.metadata import (
     DEFAULT_ENTRY_POINT_GROUP,
     PhotoMetadataPlugin,
     PhotoMetadataPluginRegistry,
