@@ -46,6 +46,13 @@ class XMPFormat(StrEnum):
     """XMP 文件格式"""
 
 
+class ACRFormat(StrEnum):
+    """ACR 文件格式"""
+
+    ACR = ".acr"
+    """Adobe Camera Raw 文件格式"""
+
+
 EXIF_SUPPORTED_FILE_EXT = [
     PhotoFormat.SONY_RAW,
     PhotoFormat.DNG,

@@ -11,7 +11,7 @@ import pillow_heif
 from loguru import logger
 from pydantic import ConfigDict, Field
 
-from modules.photograph._enums.format import PhotoFormat, XMPFormat
+from modules.photograph._enums.format import ACRFormat, PhotoFormat, XMPFormat
 from modules.photograph._enums.photo import SupportedPhotoHeifExt, SupportedPhotoRawExt
 from modules.photograph._types.photo import FileTag
 from modules.task.task import BaseTask, BaseTaskConfig
@@ -153,6 +153,7 @@ class RenameRawPhotoTask(BaseTask):
             date_time = str(date_time, "utf-8")
         elif file_ext.lower() in [
             XMPFormat.XMP,
+            ACRFormat.ACR,
         ]:
             return []
         elif file_ext.lower() in [
@@ -201,8 +202,24 @@ class RenameRawPhotoTask(BaseTask):
             attached_file = f"{file_base}{ext}"
             file_path = os.path.join(file_tag.dir, attached_file)
             if os.path.exists(file_path) and (
+                os.path.basename(file_path) in os.listdir(os.path.dirname(file_path))
+            ):
                 # 这个判断条件是为了确保严格校验文件后缀，因为在 mac 系统中不区分文件后缀的大小写
                 # 同时，这也是为什么要重新生成一个 extensions 包含 attached_file_exts 中大小写两种形式
+                task = ProcessTask(
+                    parent_dir=file_tag.dir,
+                    origin_file=attached_file,
+                    update_file=f"{update_name}{ext}",
+                    skip=(attached_file == f"{update_name}{ext}"),
+                )
+                file_tasks.append(task)
+
+        # 检查 RAW 文件是否存在附属文件(acr)
+        if self._may_have_xmp(file):
+            ext = ACRFormat.ACR.value
+            attached_file = f"{file_base}{ext}"
+            file_path = os.path.join(file_tag.dir, attached_file)
+            if os.path.exists(file_path) and (
                 os.path.basename(file_path) in os.listdir(os.path.dirname(file_path))
             ):
                 task = ProcessTask(

@@ -5,7 +5,7 @@
 from venv import logger
 
 from modules.photograph._enums.photo import PhotographDir as PD
-from modules.photograph._types.photo import FileTag
+from modules.photograph._types.photo import FileTag  # noqa: F401
 from modules.photograph.tasks.rename_raw_photo import (
     RenameRawPhotoTask,
     RenameRawPhotoTaskConfig,
@@ -15,7 +15,7 @@ from modules.task.task_manager import TaskManager
 TASK_NAME = "rename-raw-photo"
 BD = PD.ICLOUD_RAW_PHOTO
 FILE_TAG_LIST = [
-    # FileTag(tag="XXXX", dir=f"{BD}/200101-XXXX_副本"),
+    # FileTag(tag="XXXX", dir=f"{BD}/xxxxxx"),
 ]
 
 
