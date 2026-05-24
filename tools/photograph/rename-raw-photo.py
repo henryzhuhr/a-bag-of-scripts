@@ -104,10 +104,21 @@ def load_file_tag_list(value: Any, base_dir: str | None) -> list[FileTag]:
 
 
 def resolve_dir(directory: str, base_dir: str | None) -> str:
+    directory = replace_dir_placeholders(directory, base_dir)
     path = Path(directory).expanduser()
     if path.is_absolute() or base_dir is None:
         return str(path)
     return str(Path(base_dir).expanduser() / path)
+
+
+def replace_dir_placeholders(directory: str, base_dir: str | None) -> str:
+    if base_dir is not None:
+        directory = directory.replace("{base_dir}", base_dir)
+        directory = directory.replace("${base_dir}", base_dir)
+    for key, value in BASE_DIR_MAP.items():
+        directory = directory.replace(f"{{{key}}}", value)
+        directory = directory.replace(f"${{{key}}}", value)
+    return directory
 
 
 def main():

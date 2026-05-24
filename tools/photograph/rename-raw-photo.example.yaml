@@ -12,3 +12,8 @@ base_dir: icloud_raw_photo
 file_tag_list:
   # - tag: XXXX
   #   dir: xxxxxx
+  # 也可以在 dir 中显式使用占位符：
+  # - tag: XXXX
+  #   dir: "{base_dir}/xxxxxx"
+  # - tag: XXXX
+  #   dir: "${icloud_raw_photo}/xxxxxx"
