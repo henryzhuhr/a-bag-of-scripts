@@ -2,6 +2,9 @@
 #   Project-specific
 # =========================
 .worktrees/
+.omc
+.omo
+tools/photograph/rename-raw-photo.yaml
 
 # =========================
 #   macOS.gitignore

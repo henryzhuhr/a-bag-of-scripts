@@ -1,0 +1,14 @@
+task_name: rename-raw-photo
+
+# 可选值：
+# - icloud_raw_photo
+# - local_raw_photo
+# - icloud_raw_video
+# - icloud_raw_timelapse_photo
+# - icloud_raw_pano
+# 也可以直接写完整路径，例如：~/Photograph-Raw
+base_dir: icloud_raw_photo
+
+file_tag_list:
+  # - tag: XXXX
+  #   dir: xxxxxx

@@ -1,3 +1,7 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
 [project]
 name = "a-bag-of-scripts"
 version = "0.1.0"
@@ -14,6 +18,39 @@ dependencies = [
     "pytest>=8.4.1",
     "pyyaml>=6.0.2",
 ]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.12.0",
+]
+
+[project.scripts]
+rename-raw-photo = "modules.photograph.cli.rename_raw_photo:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["modules"]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 88
+src = ["modules", "scripts", "tools", "test", "utils"]
+
+[tool.ruff.lint]
+# E/F/I 分别覆盖 pycodestyle 错误、pyflakes 诊断和 import 排序。
+# I001（import 块未排序或格式不正确）和 F401（未使用的 import）
+# 都可以通过 `uv run ruff check --fix ...` 自动修复。
+select = ["E", "F", "I"]
+ignore = ["E501"]
+fixable = ["ALL"]
+
+[tool.ruff.lint.isort]
+# Ruff 排序 import 时，将本项目包按 first-party import 分组。
+known-first-party = ["modules", "utils"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "auto"
 
 [[tool.uv.index]]
 url = "https://mirrors.ustc.edu.cn/pypi/simple"

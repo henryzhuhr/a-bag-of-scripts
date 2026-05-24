@@ -25,6 +25,12 @@ class ProcessTask:
         self.skip = skip
 
 
+class InvalidFile:
+    def __init__(self, file_path: str, reason: str):
+        self.file_path = file_path
+        self.reason = reason
+
+
 class RenameRawPhotoTaskConfig(BaseTaskConfig):
     file_tag_list: List[FileTag] = Field(
         default_factory=list, description="文件标签列表"
@@ -57,6 +63,7 @@ class RenameRawPhotoTask(BaseTask):
     def __init__(self, config: RenameRawPhotoTaskConfig):
         super().__init__(config)
         self.config = config
+        self.invalid_files: List[InvalidFile] = []
         self.process_tasks: List[ProcessTask] = self._find_all_files()
         """处理任务列表"""
 
@@ -64,7 +71,14 @@ class RenameRawPhotoTask(BaseTask):
         return self.config.name
 
     def describe(self) -> str:
-        return f"task [{self.config.name}] with {len(self.process_tasks)} files to process."
+        return (
+            f"task [{self.config.name}] with {len(self.process_tasks)} files to process, "
+            f"{len(self.invalid_files)} invalid files."
+        )
+
+    @property
+    def process_task_list(self) -> List[ProcessTask]:
+        return self.process_tasks
 
     def execute(self, dry_run: bool = False):
         logger.info(f"start executing task [{self.config.name}]，dry_run={dry_run}")
@@ -115,7 +129,13 @@ class RenameRawPhotoTask(BaseTask):
         # 遍历文件夹
         for file_tag in self.config.file_tag_list:
             # 遍历文件
-            for file in os.listdir(file_tag.dir):
+            try:
+                files = os.listdir(file_tag.dir)
+            except OSError as e:
+                self._record_invalid_file(file_tag.dir, e)
+                continue
+
+            for file in files:
                 file_tag_items.append(FileTagItem(file, file_tag))
 
         # 拆开两个逻辑的目的是为了避免文件夹不存在或者其他文件系统的错误
@@ -123,9 +143,18 @@ class RenameRawPhotoTask(BaseTask):
 
         process_tasks: List[ProcessTask] = []
         for item in file_tag_items:
-            tasks = self._generat_task(item.file, item.tag)
+            try:
+                tasks = self._generat_task(item.file, item.tag)
+            except Exception as e:
+                self._record_invalid_file(os.path.join(item.tag.dir, item.file), e)
+                continue
             process_tasks.extend(tasks)
         return process_tasks
+
+    def _record_invalid_file(self, file_path: str, error: Exception):
+        reason = str(error)
+        self.invalid_files.append(InvalidFile(file_path=file_path, reason=reason))
+        logger.error(f"invalid file found: '{file_path}', reason: {reason}")
 
     def _generat_task(self, file: str, file_tag: FileTag) -> List[ProcessTask]:
         if file.startswith("."):
@@ -141,7 +170,7 @@ class RenameRawPhotoTask(BaseTask):
         if file_ext.lower() in self.config.exif_supported_ext:
             with open(file_path, "rb") as f:
                 exif_data = exifread.process_file(f, details=False, strict=True)
-                date_time = exif_data["EXIF DateTimeOriginal"].printable
+                date_time = self._get_exif_date_time_original(exif_data, file_path)
         elif file_ext.lower() in self.config.heif_supported_ext:
             # reference from: https://github.com/bigcat88/pillow_heif/blob/master/examples/heif_dump_info.py
             heif_file = pillow_heif.open_heif(file_path)
@@ -162,7 +191,7 @@ class RenameRawPhotoTask(BaseTask):
         ]:
             with open(file_path, "rb") as f:
                 exif_data = exifread.process_file(f, details=False, strict=True)
-                date_time = exif_data["EXIF DateTimeOriginal"].printable
+                date_time = self._get_exif_date_time_original(exif_data, file_path)
         else:
             raise ValueError(
                 f"unsupported file type '{file_ext}' for file '{file_path}'"
@@ -230,6 +259,14 @@ class RenameRawPhotoTask(BaseTask):
                 )
                 file_tasks.append(task)
         return file_tasks
+
+    def _get_exif_date_time_original(self, exif_data, file_path: str) -> str:
+        try:
+            return exif_data["EXIF DateTimeOriginal"].printable
+        except KeyError as e:
+            raise ValueError(
+                f"metadata 'EXIF DateTimeOriginal' not found in file '{file_path}'"
+            ) from e
 
     def _may_have_xmp(self, file: str) -> bool:
         """判断文件是否可能包含 xmp 文件"""

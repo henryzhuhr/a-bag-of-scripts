@@ -69,6 +69,7 @@ def test_generate_and_execute(monkeypatch, temp_photo_dir):
     assert "DSC00001.ARW" in files
     assert "DSC00001.xmp" in files
     # 真正执行
+    monkeypatch.setattr(task, "confirm", lambda: True)
     task.execute(dry_run=False)
     # 检查文件是否已重命名
     files = os.listdir(temp_photo_dir)
